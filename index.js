@@ -55,7 +55,55 @@ async function run() {
       })
     }
 
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
+      const isAdmin = user?.role === 'admin'
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      next()
+    }
+
+    const verifyHR = async (req, res, next) => {
+      const email = req.decoded.email
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
+      const isHR = user?.role === 'hr'
+      if (!isHR) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      next()
+    }
+
     // user related api
+
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+      const result = await userCollection.find().toArray()
+      res.send(result)
+    })
+
+    app.get('/users/admin/:email', verifyToken, async (req, res) => {
+      const email = req.params.email
+
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
+      let admin = false
+      if (user) {
+        admin = user?.role === 'admin'
+      }
+      res.send({ admin })
+    })
+
+    app.get('/users/employees', verifyToken, verifyHR, async (req, res) => {
+      const result = await userCollection.find({ role: 'employee' }).toArray()
+      res.send(result)
+    })
 
     app.post('/users', async (req, res) => {
       const user = req.body
@@ -67,17 +115,6 @@ async function run() {
       const result = await userCollection.insertOne(user)
       res.send(result)
     })
-
-    const verifyAdmin = async (req, res, next) => {
-      const email = req.decoded.email
-      const query = { email: email }
-      const user = await userCollection.findOne(query)
-      const isAdmin = user?.role === 'admin'
-      if (!isAdmin) {
-        return res.status(403).send({ message: 'forbidden access' })
-      }
-      next()
-    }
 
     //  Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
