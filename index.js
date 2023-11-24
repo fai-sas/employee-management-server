@@ -8,6 +8,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 
 const app = express()
 
+app.use(cors())
 app.use(express.json())
 app.use(cookieParser())
 
@@ -27,6 +28,8 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect()
+
+    const userCollection = client.db('EmployeeManagement').collection('Users')
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -64,6 +67,17 @@ async function run() {
       const result = await userCollection.insertOne(user)
       res.send(result)
     })
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
+      const isAdmin = user?.role === 'admin'
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      next()
+    }
 
     //  Send a ping to confirm a successful connection
     // await client.db('admin').command({ ping: 1 })
