@@ -41,13 +41,30 @@ async function run() {
     })
 
     // middlewares
+    // const verifyToken = (req, res, next) => {
+    //   if (!req.headers.authorization) {
+    //     return res.status(401).send({ message: 'unauthorized access' })
+    //   }
+    //   const token = req.headers.authorization.split(' ')[1]
+    //   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    //     if (err) {
+    //       return res.status(401).send({ message: 'unauthorized access' })
+    //     }
+    //     req.decoded = decoded
+    //     next()
+    //   })
+    // }
+
     const verifyToken = (req, res, next) => {
       if (!req.headers.authorization) {
+        console.log('No token found')
         return res.status(401).send({ message: 'unauthorized access' })
       }
       const token = req.headers.authorization.split(' ')[1]
+      console.log('Token:', token)
       jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
         if (err) {
+          console.log('Token verification failed:', err)
           return res.status(401).send({ message: 'unauthorized access' })
         }
         req.decoded = decoded
@@ -121,8 +138,31 @@ async function run() {
       res.send(result)
     })
 
+    app.get('/users/employees/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await userCollection.findOne(query)
+      res.send(result)
+    })
+
+    app.patch('/users/employees/:id', async (req, res) => {
+      console.log('Received PATCH request:', req.params.id)
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const updatedStatus = req.body
+      console.log(updatedStatus)
+      const updateDoc = {
+        $set: {
+          isVerified: updatedStatus.isVerified,
+        },
+      }
+      const result = await userCollection.updateOne(query, updateDoc)
+      res.send(result)
+    })
+
     app.post('/users', async (req, res) => {
       const user = req.body
+      user.isVerified = false
       const query = { email: user.email }
       const existingUser = await userCollection.findOne(query)
       if (existingUser) {
