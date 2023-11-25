@@ -31,6 +31,9 @@ async function run() {
 
     const userCollection = client.db('EmployeeManagement').collection('Users')
     const taskCollection = client.db('EmployeeManagement').collection('Tasks')
+    const paymentCollection = client
+      .db('EmployeeManagement')
+      .collection('Tasks')
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -100,6 +103,43 @@ async function run() {
       res.send(result)
     })
 
+    app.get('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const result = await userCollection.findOne(query)
+      res.send(result)
+    })
+
+    app.patch('/users/:id', async (req, res) => {
+      console.log('Received PATCH request:', req.params.id)
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const updatedStatus = req.body
+      console.log(updatedStatus)
+      const updateDoc = {
+        $set: {
+          role: updatedStatus.role,
+          isVerified: updatedStatus.isVerified,
+        },
+      }
+      const result = await userCollection.updateOne(query, updateDoc)
+      res.send(result)
+    })
+
+    // fire employee
+    app.patch('/users/fire/:id', async (req, res) => {
+      const id = req.params.id
+      const query = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          isFired: true,
+          email: null,
+        },
+      }
+      const result = await userCollection.updateOne(query, updateDoc)
+      res.send(result)
+    })
+
     app.get('/users/admin/:email', verifyToken, async (req, res) => {
       const email = req.params.email
 
@@ -148,19 +188,19 @@ async function run() {
       res.send({ employee })
     })
 
-    app.get('/users/employees', verifyToken, verifyHR, async (req, res) => {
+    app.get('/employees', async (req, res) => {
       const result = await userCollection.find({ role: 'employee' }).toArray()
       res.send(result)
     })
 
-    app.get('/users/employees/:id', async (req, res) => {
+    app.get('/employees/:id', async (req, res) => {
       const id = req.params.id
       const query = { _id: new ObjectId(id) }
       const result = await userCollection.findOne(query)
       res.send(result)
     })
 
-    app.patch('/users/employees/:id', async (req, res) => {
+    app.patch('/employees/:id', async (req, res) => {
       console.log('Received PATCH request:', req.params.id)
       const id = req.params.id
       const query = { _id: new ObjectId(id) }
@@ -198,6 +238,38 @@ async function run() {
     app.get('/tasks', verifyToken, verifyEmployee, async (req, res) => {
       const result = await taskCollection.find().toArray()
       res.send(result)
+    })
+
+    // payment intent
+    app.post('/create-payment-intent', async (req, res) => {
+      const { salary } = req.body
+      const amount = parseInt(salary * 100)
+      console.log(amount, 'amount inside the intent')
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card'],
+      })
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      })
+    })
+
+    app.get('/payments/:email', verifyToken, async (req, res) => {
+      const query = { email: req.params.email }
+      if (req.params.email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      const result = await paymentCollection.find(query).toArray()
+      res.send(result)
+    })
+
+    app.post('/payments', async (req, res) => {
+      const payment = req.body
+      const paymentResult = await paymentCollection.insertOne(payment)
+      res.send({ paymentResult })
     })
 
     //  Send a ping to confirm a successful connection
