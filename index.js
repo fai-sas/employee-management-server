@@ -30,6 +30,7 @@ async function run() {
     // await client.connect()
 
     const userCollection = client.db('EmployeeManagement').collection('Users')
+    const taskCollection = client.db('EmployeeManagement').collection('Tasks')
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -41,19 +42,6 @@ async function run() {
     })
 
     // middlewares
-    // const verifyToken = (req, res, next) => {
-    //   if (!req.headers.authorization) {
-    //     return res.status(401).send({ message: 'unauthorized access' })
-    //   }
-    //   const token = req.headers.authorization.split(' ')[1]
-    //   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-    //     if (err) {
-    //       return res.status(401).send({ message: 'unauthorized access' })
-    //     }
-    //     req.decoded = decoded
-    //     next()
-    //   })
-    // }
 
     const verifyToken = (req, res, next) => {
       if (!req.headers.authorization) {
@@ -89,6 +77,17 @@ async function run() {
       const user = await userCollection.findOne(query)
       const isHR = user?.role === 'hr'
       if (!isHR) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      next()
+    }
+
+    const verifyEmployee = async (req, res, next) => {
+      const email = req.decoded.email
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
+      const isEmployee = user?.role === 'employee'
+      if (!isEmployee) {
         return res.status(403).send({ message: 'forbidden access' })
       }
       next()
@@ -133,6 +132,22 @@ async function run() {
       res.send({ hr })
     })
 
+    app.get('/users/employee/:email', verifyToken, async (req, res) => {
+      const email = req.params.email
+
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+
+      const query = { email: email }
+      const user = await userCollection.findOne(query)
+      let employee = false
+      if (user) {
+        employee = user?.role === 'employee'
+      }
+      res.send({ employee })
+    })
+
     app.get('/users/employees', verifyToken, verifyHR, async (req, res) => {
       const result = await userCollection.find({ role: 'employee' }).toArray()
       res.send(result)
@@ -169,6 +184,19 @@ async function run() {
         return res.send({ message: 'user already exists', insertedId: null })
       }
       const result = await userCollection.insertOne(user)
+      res.send(result)
+    })
+
+    // task related api
+
+    app.post('/tasks', verifyToken, verifyEmployee, async (req, res) => {
+      const item = req.body
+      const result = await taskCollection.insertOne(item)
+      res.send(result)
+    })
+
+    app.get('/tasks', verifyToken, verifyEmployee, async (req, res) => {
+      const result = await taskCollection.find().toArray()
       res.send(result)
     })
 
