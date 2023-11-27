@@ -33,7 +33,7 @@ async function run() {
     const taskCollection = client.db('EmployeeManagement').collection('Tasks')
     const paymentCollection = client
       .db('EmployeeManagement')
-      .collection('Tasks')
+      .collection('Payments')
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -235,20 +235,24 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/tasks', verifyToken, verifyEmployee, async (req, res) => {
+    app.get('/tasks', async (req, res) => {
       const result = await taskCollection.find().toArray()
       res.send(result)
     })
 
     // payment intent
     app.post('/create-payment-intent', async (req, res) => {
-      const { salary } = req.body
+      const { salary, selectedMonth, selectedYear } = req.body
       const amount = parseInt(salary * 100)
       console.log(amount, 'amount inside the intent')
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: 'usd',
+        metadata: {
+          selectedMonth,
+          selectedYear,
+        },
         payment_method_types: ['card'],
       })
 
@@ -270,6 +274,11 @@ async function run() {
       const payment = req.body
       const paymentResult = await paymentCollection.insertOne(payment)
       res.send({ paymentResult })
+    })
+
+    app.get('/payments', verifyToken, async (req, res) => {
+      const result = await paymentCollection.find().toArray()
+      res.send(result)
     })
 
     //  Send a ping to confirm a successful connection
