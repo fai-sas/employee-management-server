@@ -242,6 +242,7 @@ async function run() {
 
     // payment intent
     app.post('/create-payment-intent', async (req, res) => {
+      console.log('Request Body:', req.body)
       const { salary, selectedMonth, selectedYear } = req.body
       const amount = parseInt(salary * 100)
       console.log(amount, 'amount inside the intent')
@@ -256,9 +257,7 @@ async function run() {
         payment_method_types: ['card'],
       })
 
-      res.send({
-        clientSecret: paymentIntent.client_secret,
-      })
+      res.send({ paymentIntent, clientSecret: paymentIntent.client_secret })
     })
 
     app.get('/payments/:email', verifyToken, async (req, res) => {
@@ -279,6 +278,23 @@ async function run() {
     app.get('/payments', verifyToken, async (req, res) => {
       const result = await paymentCollection.find().toArray()
       res.send(result)
+    })
+
+    app.get('/payments/check/:month/:year', verifyToken, async (req, res) => {
+      try {
+        const { month, year } = req.params
+        const query = {
+          selectedMonth: month,
+          selectedYear: year,
+          email: req.decoded.email,
+        }
+
+        const existingPayment = await paymentCollection.findOne(query)
+
+        res.send({ paymentMade: !!existingPayment })
+      } catch (error) {
+        console.error('Error checking payment status', error)
+      }
     })
 
     //  Send a ping to confirm a successful connection
